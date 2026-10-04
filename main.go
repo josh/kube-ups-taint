@@ -430,6 +430,11 @@ func run(ctx context.Context, cfg config, clientset *kubernetes.Clientset) error
 			}
 		}
 		if len(matched) == 0 {
+			if len(cfg.ups) > 0 && isManaged(&node) {
+				if err := releaseNode(ctx, clientset, node.Name); err != nil {
+					errs = append(errs, fmt.Errorf("release node %s: %w", node.Name, err))
+				}
+			}
 			continue
 		}
 		if len(matched) > 1 {
@@ -478,6 +483,40 @@ func syncNode(ctx context.Context, cfg config, clientset *kubernetes.Clientset, 
 		}
 		slog.Info("updated node taints", "node", nodeName, "ups", u.name, "taints", formatTaints(desired))
 		recordEvent(ctx, clientset, node, u, r, stale, desired)
+		return nil
+	})
+}
+
+func isManaged(node *corev1.Node) bool {
+	if len(ownedTaints(node.Spec.Taints)) > 0 {
+		return true
+	}
+	for key := range node.Annotations {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func releaseNode(ctx context.Context, clientset *kubernetes.Clientset, nodeName string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := clientset.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("get node: %w", err)
+		}
+		if !isManaged(node) {
+			return nil
+		}
+
+		removed := ownedTaints(node.Spec.Taints)
+		node.Spec.Taints = mergeTaints(node.Spec.Taints, nil, time.Now())
+		maps.DeleteFunc(node.Annotations, func(key, _ string) bool { return strings.HasPrefix(key, prefix) })
+		if _, err := clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{FieldManager: fieldManager}); err != nil {
+			return err
+		}
+
+		slog.Info("released node no longer mapped to a ups", "node", nodeName, "removedTaints", formatTaints(removed))
 		return nil
 	})
 }
