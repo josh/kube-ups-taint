@@ -1,0 +1,67 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/josh/kube-ups-taint
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+ups: []
+#  - name: rack-a
+#    address: ups@192.0.2.10:3493
+#    nodeSelector: ""
+#    secretName: ""
+
+controller:
+  interval: 15s
+  staleAfter: 2m
+  maxConsecutiveFailures: 10
+  batterySteps:
+    - 50
+  runtimeSteps: []
+  batteryChargeTaint: false
+  batteryRuntimeTaint: false
+  debug: false
+
+serviceAccount:
+  create: true
+  name: ""
+
+priorityClassName: system-cluster-critical
+
+nodeFailureTolerationSeconds: 5
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []
+
+networkPolicy:
+  ingress:
+    enabled: false
+    rules: []
+  egress:
+    enabled: false
+    dns:
+      enabled: true
+      to: []
+    kubeApiServer:
+      enabled: true
+      hosts: []
+      port: 6443
+    nut:
+      enabled: true
+      hosts: []
+      port: 3493
+    rules: []
+
+resources:
+  limits:
+    cpu: 50m
+    memory: 64Mi
+  requests:
+    cpu: 5m
+    memory: 24Mi

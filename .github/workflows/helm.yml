@@ -1,0 +1,26 @@
+name: Helm
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Helm
+        run: |
+          curl --fail --silent --show-error --location --output get-helm.sh https://raw.githubusercontent.com/helm/helm/5ae85868d45ca7bb9ac3ef7a10e0db54b8a8695c/scripts/get-helm-4
+          bash get-helm.sh --version "v${HELM_VERSION}"
+        env:
+          HELM_VERSION: "4.2.4"
+
+      - name: Lint chart
+        run: |
+          helm lint ./charts/kube-ups-taint
+
+      - name: Template chart
+        run: |
+          helm template test ./charts/kube-ups-taint

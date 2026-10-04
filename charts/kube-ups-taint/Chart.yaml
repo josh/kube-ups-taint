@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kube-ups-taint
+description: A Kubernetes controller that taints nodes from NUT UPS battery state so pods are shed during power outages
+type: application
+version: "0.0.0"
+appVersion: "0.0.0"
+kubeVersion: ">=1.29.0"

@@ -1,0 +1,129 @@
+{{- $prefix := "kube-ups-taint.josh.github.io" }}
+{{- $secrets := list }}
+{{- range .Values.ups }}
+{{- if .secretName }}
+{{- $secrets = append $secrets . }}
+{{- end }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kube-ups-taint.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kube-ups-taint.labels" . | nindent 4 }}
+spec:
+  replicas: {{ int .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kube-ups-taint.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kube-ups-taint.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kube-ups-taint.serviceAccountName" . }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: {{ $prefix }}/status
+          operator: Exists
+        {{- range .Values.controller.batterySteps }}
+        - key: {{ $prefix }}/battery-below-{{ int . }}
+          operator: Exists
+        {{- end }}
+        {{- range .Values.controller.runtimeSteps }}
+        - key: {{ $prefix }}/runtime-below-{{ int . }}
+          operator: Exists
+        {{- end }}
+        - key: {{ $prefix }}/battery-charge
+          operator: Exists
+        - key: {{ $prefix }}/battery-runtime
+          operator: Exists
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: {{ int .Values.nodeFailureTolerationSeconds }}
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: {{ int .Values.nodeFailureTolerationSeconds }}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      affinity:
+        {{- if .Values.affinity }}
+        {{- toYaml .Values.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "kube-ups-taint.selectorLabels" . | nindent 20 }}
+        {{- end }}
+      topologySpreadConstraints:
+        {{- if .Values.topologySpreadConstraints }}
+        {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+        {{- else }}
+        - maxSkew: 1
+          topologyKey: {{ $prefix }}/ups
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "kube-ups-taint.selectorLabels" . | nindent 14 }}
+        {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ include "kube-ups-taint.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: controller-config
+              mountPath: /etc/kube-ups-taint
+              readOnly: true
+            {{- if $secrets }}
+            - name: nut-secrets
+              mountPath: /var/run/secrets/nut
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: controller-config
+          configMap:
+            name: {{ include "kube-ups-taint.fullname" . }}-config
+        {{- if $secrets }}
+        - name: nut-secrets
+          projected:
+            sources:
+              {{- range $secrets }}
+              - secret:
+                  name: {{ .secretName }}
+                  optional: true
+                  items:
+                    - key: username
+                      path: {{ .name }}/username
+                    - key: password
+                      path: {{ .name }}/password
+              {{- end }}
+        {{- end }}

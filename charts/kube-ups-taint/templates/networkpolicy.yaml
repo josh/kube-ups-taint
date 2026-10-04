@@ -1,0 +1,73 @@
+{{- $ingress := .Values.networkPolicy.ingress }}
+{{- $egress := .Values.networkPolicy.egress }}
+{{- $ingressEnabled := $ingress.enabled }}
+{{- $egressEnabled := $egress.enabled }}
+{{- if $egressEnabled }}
+{{- if and $egress.kubeApiServer.enabled (not $egress.kubeApiServer.hosts) }}
+{{- fail "networkPolicy.egress.kubeApiServer.hosts is required when networkPolicy.egress.kubeApiServer.enabled is true" }}
+{{- end }}
+{{- if and $egress.nut.enabled (not $egress.nut.hosts) }}
+{{- fail "networkPolicy.egress.nut.hosts is required when networkPolicy.egress.nut.enabled is true" }}
+{{- end }}
+{{- end }}
+{{- if or $ingressEnabled $egressEnabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kube-ups-taint.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kube-ups-taint.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kube-ups-taint.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    {{- if $ingressEnabled }}
+    - Ingress
+    {{- end }}
+    {{- if $egressEnabled }}
+    - Egress
+    {{- end }}
+  {{- if $ingressEnabled }}
+  {{- if $ingress.rules }}
+  ingress:
+    {{- toYaml $ingress.rules | nindent 4 }}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  {{- end }}
+  {{- if $egressEnabled }}
+  {{- $rules := list }}
+  {{- if $egress.dns.enabled }}
+  {{- $dns := dict "ports" (list (dict "protocol" "UDP" "port" 53) (dict "protocol" "TCP" "port" 53)) }}
+  {{- if $egress.dns.to }}
+  {{- $_ := set $dns "to" $egress.dns.to }}
+  {{- end }}
+  {{- $rules = append $rules $dns }}
+  {{- end }}
+  {{- if $egress.kubeApiServer.enabled }}
+  {{- $to := list }}
+  {{- range $host := $egress.kubeApiServer.hosts }}
+  {{- $to = append $to (dict "ipBlock" (dict "cidr" (include "kube-ups-taint.cidr" $host))) }}
+  {{- end }}
+  {{- $ports := list (dict "protocol" "TCP" "port" (int $egress.kubeApiServer.port)) }}
+  {{- $rules = append $rules (dict "to" $to "ports" $ports) }}
+  {{- end }}
+  {{- if $egress.nut.enabled }}
+  {{- $to := list }}
+  {{- range $host := $egress.nut.hosts }}
+  {{- $to = append $to (dict "ipBlock" (dict "cidr" (include "kube-ups-taint.cidr" $host))) }}
+  {{- end }}
+  {{- $ports := list (dict "protocol" "TCP" "port" (int $egress.nut.port)) }}
+  {{- $rules = append $rules (dict "to" $to "ports" $ports) }}
+  {{- end }}
+  {{- $rules = concat $rules $egress.rules }}
+  {{- if $rules }}
+  egress:
+    {{- toYaml $rules | nindent 4 }}
+  {{- else }}
+  egress: []
+  {{- end }}
+  {{- end }}
+{{- end }}

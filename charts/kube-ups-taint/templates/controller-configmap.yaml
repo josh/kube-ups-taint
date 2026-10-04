@@ -1,0 +1,37 @@
+{{- $durations := dict "interval" .Values.controller.interval "staleAfter" .Values.controller.staleAfter }}
+{{- range $key, $value := $durations }}
+{{- if not (regexMatch `^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$` (toString $value)) }}
+{{- fail (printf "controller.%s must be a Go duration string such as \"30s\" or \"1m30s\", got %q" $key (toString $value)) }}
+{{- end }}
+{{- end }}
+{{- $ups := list }}
+{{- range $i, $u := .Values.ups }}
+{{- if not $u.name }}
+{{- fail (printf "ups[%d].name is required" $i) }}
+{{- end }}
+{{- if not $u.address }}
+{{- fail (printf "ups[%d].address is required" $i) }}
+{{- end }}
+{{- $entry := dict "name" $u.name "address" $u.address }}
+{{- if $u.nodeSelector }}
+{{- $_ := set $entry "nodeSelector" $u.nodeSelector }}
+{{- end }}
+{{- $ups = append $ups $entry }}
+{{- end }}
+{{- $batterySteps := list }}
+{{- range .Values.controller.batterySteps }}
+{{- $batterySteps = append $batterySteps (int .) }}
+{{- end }}
+{{- $runtimeSteps := list }}
+{{- range .Values.controller.runtimeSteps }}
+{{- $runtimeSteps = append $runtimeSteps (int .) }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kube-ups-taint.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kube-ups-taint.labels" . | nindent 4 }}
+data:
+  config.json: {{ dict "debug" .Values.controller.debug "interval" (toString .Values.controller.interval) "staleAfter" (toString .Values.controller.staleAfter) "maxConsecutiveFailures" (int .Values.controller.maxConsecutiveFailures) "batterySteps" $batterySteps "runtimeSteps" $runtimeSteps "batteryChargeTaint" .Values.controller.batteryChargeTaint "batteryRuntimeTaint" .Values.controller.batteryRuntimeTaint "ups" $ups | toJson | quote }}
