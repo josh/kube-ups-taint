@@ -708,8 +708,8 @@ func recordEvent(ctx context.Context, clientset *kubernetes.Clientset, node *cor
 	now := metav1.Now()
 	event := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: node.Name + ".",
-			Namespace:    metav1.NamespaceDefault,
+			Name:      fmt.Sprintf("%s.%x", node.Name, now.UnixNano()),
+			Namespace: metav1.NamespaceDefault,
 		},
 		InvolvedObject: corev1.ObjectReference{
 			APIVersion: "v1",
