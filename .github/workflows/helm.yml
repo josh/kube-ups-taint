@@ -15,7 +15,7 @@ jobs:
           curl --fail --silent --show-error --location --output get-helm.sh https://raw.githubusercontent.com/helm/helm/5ae85868d45ca7bb9ac3ef7a10e0db54b8a8695c/scripts/get-helm-4
           bash get-helm.sh --version "v${HELM_VERSION}"
         env:
-          HELM_VERSION: "4.2.4"
+          HELM_VERSION: "4.3.0"
 
       - name: Lint chart
         run: |
