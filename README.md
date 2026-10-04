@@ -162,7 +162,7 @@ A node that matches more than one entry is skipped and an error is logged.
 | `ups[].secretName`                        | Secret with `username` and `password` keys for NUT login                | `""`                          |
 | `controller.interval`                     | Polling interval                                                        | `15s`                         |
 | `controller.staleAfter`                   | How long a UPS can go unread before `status=unknown`                    | `2m`                          |
-| `controller.maxConsecutiveFailures`       | Exit after this many consecutive failed runs                            | `10`                          |
+| `controller.maxConsecutiveFailures`       | Exit after this many consecutive Kubernetes API failures                | `10`                          |
 | `controller.batterySteps`                 | Charge percentages that get `battery-below-<N>` taints                  | `[50]`                        |
 | `controller.runtimeSteps`                 | Runtime seconds that get `runtime-below-<S>` taints                     | `[]`                          |
 | `controller.batteryChargeTaint`           | Publish numeric `battery-charge` taint                                  | `false`                       |

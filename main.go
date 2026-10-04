@@ -406,7 +406,7 @@ func run(ctx context.Context, cfg config, clientset *kubernetes.Clientset) error
 	for _, u := range cfg.ups {
 		r, err := readUPS(ctx, u)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("read ups %s (%s): %w", u.name, u.address, err))
+			slog.Error("failed to read ups", "ups", u.name, "address", u.address.String(), "error", err)
 			continue
 		}
 		slog.Debug("read ups", "ups", u.name, "status", r.status, "charge", r.charge, "runtime", r.runtime)
@@ -442,7 +442,7 @@ func run(ctx context.Context, cfg config, clientset *kubernetes.Clientset) error
 			for _, u := range matched {
 				names = append(names, u.name)
 			}
-			errs = append(errs, fmt.Errorf("node %s matches multiple ups entries, skipping: %s", node.Name, strings.Join(names, ", ")))
+			slog.Error("node matches multiple ups entries, skipping", "node", node.Name, "ups", strings.Join(names, ", "))
 			continue
 		}
 		if err := syncNode(ctx, cfg, clientset, node.Name, matched[0], readings[matched[0].name]); err != nil {
