@@ -237,7 +237,7 @@ func loadConfig() (config, error) {
 	}, nil
 }
 
-var version = "0.1.2"
+var version = "0.1.3"
 
 const fieldManager = "kube-ups-taint"
 
